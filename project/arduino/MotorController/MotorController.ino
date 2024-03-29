@@ -13,8 +13,10 @@ int potentiometerpin = A1; // ANALOG
 int startButtonpin = 6; // DIGITAL
 
 // Output Cluster:
-int signalLEDpin = 7; // DIGITAL
-const int PRESET_SENSITIVITY = 25;
+int activeLEDpin = 2;
+int leftLEDpin = 4;
+int rightLEDpin = 3;
+const int PRESET_SENSITIVITY = 100;
 
 void setup() {
   Serial.begin(9600);
@@ -37,15 +39,17 @@ void setup() {
   pinMode(lightsensLEFTpin, INPUT);
 
   // Initializing Digital Outputs
-  pinMode(signalLEDpin, OUTPUT);
+  pinMode(activeLEDpin, OUTPUT);
+  pinMode(leftLEDpin, OUTPUT);
+  pinMode(rightLEDpin, OUTPUT);
 
   // While loop to hold before button press
-  digitalWrite(signalLEDpin, HIGH);
 
   config();
 }
 
 void config() {
+  digitalWrite(activeLEDpin, LOW);
   int controlButtonStatus = LOW;
   int adjLightReadRight;
   int adjLightReadLeft;
@@ -54,23 +58,14 @@ void config() {
     delay(300);
     controlButtonStatus = digitalRead(startButtonpin);
     if (controlButtonStatus == HIGH) {
-      digitalWrite(signalLEDpin, LOW);
       delay(1000);
       break;
     }
-    if (adjLightReadRight < PRESET_SENSITIVITY || adjLightReadLeft < PRESET_SENSITIVITY ) {
-      digitalWrite(signalLEDpin, HIGH);
-    } else {
-      digitalWrite(signalLEDpin, LOW);
-    }
     
-    adjPoten = map(analogRead(potentiometerpin), 0, 1023, 500, 5000);
+    adjPoten = map(analogRead(potentiometerpin), 0, 1023, 50, 500);
     adjLightReadRight = map((long) (analogRead(lightsensRIGHTpin) * (adjPoten / 100)), 0, 1023, 1, 100);
     adjLightReadLeft = map((long) (analogRead(lightsensLEFTpin) * (adjPoten / 100)), 0, 1023, 1, 100);
-    // Serial.print(adjLightReadRight);
-    // Serial.print("\n");
-    // Serial.print(adjLightReadLeft);
-    // Serial.print("\n");
+
     Serial.print("poten: ");
     Serial.print(adjPoten);
     Serial.print("\n");
@@ -81,6 +76,19 @@ void config() {
     Serial.print(adjLightReadLeft);
     Serial.print("\n");
 
+    if (adjLightReadRight < PRESET_SENSITIVITY && adjLightReadLeft < PRESET_SENSITIVITY) { // 0 - 0
+      digitalWrite(leftLEDpin, LOW);
+      digitalWrite(rightLEDpin, LOW);
+    } else if (adjLightReadRight < PRESET_SENSITIVITY && adjLightReadLeft >= PRESET_SENSITIVITY) { // 0 - 1
+      digitalWrite(leftLEDpin, LOW);
+      digitalWrite(rightLEDpin, HIGH);
+    } else if (adjLightReadRight >= PRESET_SENSITIVITY && adjLightReadLeft < PRESET_SENSITIVITY) { // 1 - 0
+      digitalWrite(leftLEDpin, HIGH);
+      digitalWrite(rightLEDpin, LOW);
+    } else { // 1 - 1
+      digitalWrite(leftLEDpin, HIGH);
+      digitalWrite(rightLEDpin, HIGH);
+    }
 
     //digitalWrite();
 
@@ -92,6 +100,7 @@ int lightRight;
 int lightLeft;
 
 void loop() {
+  digitalWrite(activeLEDpin, HIGH);
   // put your main code here, to run repeatedly:
 
   //Controlling speed (0  = off and 255 = max speed):
@@ -99,23 +108,17 @@ void loop() {
   // analogWrite(motor2speed, 255); 
 
   // Both Run the same direction set up like this. WARNING flipping motors will flip directions.
-  digitalWrite(motor1pin1,  HIGH);
-  digitalWrite(motor1pin2, LOW);
+  // digitalWrite(motor1pin1,  HIGH);
+  // digitalWrite(motor1pin2, LOW);
 
-  digitalWrite(motor2pin1,  HIGH);
-  digitalWrite(motor2pin2, LOW);
+  // digitalWrite(motor2pin1,  HIGH);
+  // digitalWrite(motor2pin2, LOW);
 
   delay(10);
 
-  sensitivityScale = map(analogRead(potentiometerpin), 0, 1023, 500, 5000);
+  sensitivityScale = map(analogRead(potentiometerpin), 0, 1023, 50, 500);
   lightRight = map((long) (analogRead(lightsensRIGHTpin) * (sensitivityScale / 100)), 0, 1023, 1, 100);
   lightLeft = map((long) (analogRead(lightsensLEFTpin) * (sensitivityScale / 100)), 0, 1023, 1, 100);
-
-  if (lightRight < PRESET_SENSITIVITY && lightLeft < PRESET_SENSITIVITY ) {
-    digitalWrite(signalLEDpin, HIGH);
-  } else {
-    digitalWrite(signalLEDpin, LOW);
-  }
 
   if (digitalRead(startButtonpin) == HIGH) {
     digitalWrite(motor1pin1, LOW);
@@ -127,19 +130,34 @@ void loop() {
     config();
   }
 
-  if (lightRight > PRESET_SENSITIVITY && lightLeft > PRESET_SENSITIVITY) { // 0 - 0
-    adjustSpeed(50, 100);
-  } else if (lightRight > PRESET_SENSITIVITY && lightLeft <= PRESET_SENSITIVITY) { // 0 - 1
-    adjustSpeed(100, 30);
-  } else if (lightRight <= PRESET_SENSITIVITY && lightRight > PRESET_SENSITIVITY) { // 1 - 0
-    adjustSpeed(75, 100);
+  // Low means "light", and high means "dark"
+  // if it's "light", then the value is about 10
+
+  if (lightRight < PRESET_SENSITIVITY && lightLeft < PRESET_SENSITIVITY) { // 0 - 0
+    adjustSpeed(100, 100, 1);
+    digitalWrite(leftLEDpin, LOW);
+    digitalWrite(rightLEDpin, LOW);
+    Serial.print("0 0\n");
+  } else if (lightRight < PRESET_SENSITIVITY && lightLeft >= PRESET_SENSITIVITY) { // 0 - 1
+    adjustSpeed(100, 75, 1);
+    digitalWrite(leftLEDpin, LOW);
+    digitalWrite(rightLEDpin, HIGH);
+    Serial.print("0 1\n");
+  } else if (lightRight >= PRESET_SENSITIVITY && lightLeft < PRESET_SENSITIVITY) { // 1 - 0
+    adjustSpeed(75, 100, 1);
+    digitalWrite(leftLEDpin, HIGH);
+    digitalWrite(rightLEDpin, LOW);
+    Serial.print("1 0\n");
   } else { // 1 - 1
-    adjustSpeed(100, 50);
+    adjustSpeed(0, 0, 1);
+    digitalWrite(leftLEDpin, HIGH);
+    digitalWrite(rightLEDpin, HIGH);
+    Serial.print("1 1\n");
   }
 
 }
 
-void adjustSpeed(int left, int right) {
-  analogWrite(motor1speed, map(right, 0, 100, 50, 255)); 
-  analogWrite(motor2speed, map(left, 0, 100, 50, 255)); 
+void adjustSpeed(int left, int right, float mult) {
+  analogWrite(motor1speed, map(right, 0, 100, 50, 255) * mult); 
+  analogWrite(motor2speed, map(left, 0, 100, 50, 255) * mult); 
 }

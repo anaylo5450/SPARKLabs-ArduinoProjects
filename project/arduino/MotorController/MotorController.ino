@@ -16,7 +16,18 @@ int startButtonpin = 6; // DIGITAL
 int activeLEDpin = 2;
 int leftLEDpin = 4;
 int rightLEDpin = 3;
+
+// constants
 const int PRESET_SENSITIVITY = 100;
+const float SPEED_MULTIPLIER = 1.0;
+const int RIGHT_SPEED_00 = 100;
+const int LEFT_SPEED_00 = 100;
+const int RIGHT_SPEED_01 = 75;
+const int LEFT_SPEED_01 = 100;
+const int RIGHT_SPEED_10 = 100;
+const int LEFT_SPEED_10 = 75;
+const int RIGHT_SPEED_11 = -1;
+const int LEFT_SPEED_11 = -1;
 
 void setup() {
   Serial.begin(9600);
@@ -108,11 +119,11 @@ void loop() {
   // analogWrite(motor2speed, 255); 
 
   // Both Run the same direction set up like this. WARNING flipping motors will flip directions.
-  // digitalWrite(motor1pin1,  HIGH);
-  // digitalWrite(motor1pin2, LOW);
+  digitalWrite(motor1pin1,  HIGH);
+  digitalWrite(motor1pin2, LOW);
 
-  // digitalWrite(motor2pin1,  HIGH);
-  // digitalWrite(motor2pin2, LOW);
+  digitalWrite(motor2pin1,  HIGH);
+  digitalWrite(motor2pin2, LOW);
 
   delay(10);
 
@@ -134,22 +145,22 @@ void loop() {
   // if it's "light", then the value is about 10
 
   if (lightRight < PRESET_SENSITIVITY && lightLeft < PRESET_SENSITIVITY) { // 0 - 0
-    adjustSpeed(100, 100, 1);
+    adjustSpeed(LEFT_SPEED_00, RIGHT_SPEED_00, SPEED_MULTIPLIER);
     digitalWrite(leftLEDpin, LOW);
     digitalWrite(rightLEDpin, LOW);
     Serial.print("0 0\n");
   } else if (lightRight < PRESET_SENSITIVITY && lightLeft >= PRESET_SENSITIVITY) { // 0 - 1
-    adjustSpeed(100, 75, 1);
+    adjustSpeed(LEFT_SPEED_01, RIGHT_SPEED_01, SPEED_MULTIPLIER);
     digitalWrite(leftLEDpin, LOW);
     digitalWrite(rightLEDpin, HIGH);
     Serial.print("0 1\n");
   } else if (lightRight >= PRESET_SENSITIVITY && lightLeft < PRESET_SENSITIVITY) { // 1 - 0
-    adjustSpeed(75, 100, 1);
+    adjustSpeed(LEFT_SPEED_10, RIGHT_SPEED_10, SPEED_MULTIPLIER);
     digitalWrite(leftLEDpin, HIGH);
     digitalWrite(rightLEDpin, LOW);
     Serial.print("1 0\n");
   } else { // 1 - 1
-    adjustSpeed(0, 0, 1);
+    adjustSpeed(LEFT_SPEED_11, RIGHT_SPEED_11, SPEED_MULTIPLIER);
     digitalWrite(leftLEDpin, HIGH);
     digitalWrite(rightLEDpin, HIGH);
     Serial.print("1 1\n");
@@ -157,7 +168,23 @@ void loop() {
 
 }
 
+// Accepts percentage values from 0-100 & a float as a speed multiplier.
+// As of 3/29/24, also accepts negative values; they make the motors shut off for that condition.
 void adjustSpeed(int left, int right, float mult) {
-  analogWrite(motor1speed, map(right, 0, 100, 50, 255) * mult); 
-  analogWrite(motor2speed, map(left, 0, 100, 50, 255) * mult); 
+  if !(right < 0 && left < 0) {
+    if (right < 0) {
+      right = 0;
+    }
+    if (left < 0) {
+      left = 0;
+    }
+    analogWrite(motor1speed, map(right, 0, 100, 50, 255) * mult); 
+    analogWrite(motor2speed, map(left, 0, 100, 50, 255) * mult); 
+    return;
+  }
+
+  // Negative number case is shutting the motors off.
+  analogWrite(motor1speed, 0);
+  analogWrite(motor2speed, 0);
+  
 }

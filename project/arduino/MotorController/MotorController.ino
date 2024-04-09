@@ -10,7 +10,7 @@ int motor2speed = 10; //ENA pin
 int lightsensRIGHTpin = A3; // ANALOG
 int lightsensLEFTpin = A2; // ANALOG
 int potentiometerpin = A1; // ANALOG
-int startButtonpin = A0; // DIGITAL
+int startButtonpin = A0; // ANALOG
 
 // Output Cluster:
 int activeLEDpin = 2;
@@ -19,8 +19,8 @@ int rightLEDpin = 3;
 
 // constants
 const int PRESET_SENSITIVITY = 100;
-const float SPEED_MULTIPLIER = .3;
-const float TURN_MULTIPLIER = .3;
+const float SPEED_MULTIPLIER = .25;
+const float TURN_MULTIPLIER = .6;
 const int RIGHT_SPEED_00 = 100;
 const int LEFT_SPEED_00 = 100;
 const int RIGHT_SPEED_01 = 75;
@@ -29,6 +29,9 @@ const int RIGHT_SPEED_10 = 100;
 const int LEFT_SPEED_10 = 75;
 const int RIGHT_SPEED_11 = -1;
 const int LEFT_SPEED_11 = -1;
+const int REVERSE_SPEED = -90;
+
+const int BUTTON_THREASHOLD = 1000;
 
 void setup() {
   Serial.begin(9600);
@@ -44,8 +47,11 @@ void setup() {
   pinMode(motor1speed,  OUTPUT); 
   pinMode(motor2speed, OUTPUT);
 
-  // Initializing Digital Inputs
+  // THIS BASTARD BUTTON
   pinMode(startButtonpin, INPUT);
+  analogWrite(startButtonpin, 0);
+
+  // Initializing Digital Inputs
   pinMode(potentiometerpin, INPUT);
   pinMode(lightsensRIGHTpin, INPUT);
   pinMode(lightsensLEFTpin, INPUT);
@@ -64,6 +70,7 @@ void config() {
   Serial.println("Entering Config");
   
   digitalWrite(activeLEDpin, LOW);
+  //analogWrite(startButtonpin, 0);
   
   int adjLightReadRight;
   int adjLightReadLeft;
@@ -71,10 +78,12 @@ void config() {
   while (true) {
     delay(250);
 
-    if (analogRead(startButtonpin) > 900) {
+    if (analogRead(startButtonpin) > BUTTON_THREASHOLD) {
       digitalWrite(activeLEDpin, HIGH);
       delay(1000);
+      Serial.println("Start Robot");
       Serial.println(analogRead(startButtonpin));
+      analogWrite(startButtonpin, 0);
       break;
     }
     
@@ -83,14 +92,13 @@ void config() {
     adjLightReadLeft = map((long) (analogRead(lightsensLEFTpin) * (adjPoten / 100)), 0, 1023, 1, 100);
 
     Serial.print("poten: ");
-    Serial.print(adjPoten);
-    Serial.print("\n");
+    Serial.println(adjPoten);
     Serial.print("right: ");
-    Serial.print(adjLightReadRight);
-    Serial.print("\n");
+    Serial.println(adjLightReadRight);
     Serial.print("left: ");
-    Serial.print(adjLightReadLeft);
-    Serial.print("\n");
+    Serial.println(adjLightReadLeft);
+    Serial.print("THE BUTTON :: ");
+    Serial.println(analogRead(startButtonpin));
 
     if (adjLightReadRight < PRESET_SENSITIVITY && adjLightReadLeft < PRESET_SENSITIVITY) { // 0 - 0
       digitalWrite(leftLEDpin, LOW);
@@ -130,8 +138,10 @@ void loop() {
   sensitivityScale = map(analogRead(potentiometerpin), 0, 1023, 50, 500);
   lightRight = map((long) (analogRead(lightsensRIGHTpin) * (sensitivityScale / 100)), 0, 1023, 1, 100);
   lightLeft = map((long) (analogRead(lightsensLEFTpin) * (sensitivityScale / 100)), 0, 1023, 1, 100);
+  
+  Serial.println(analogRead(startButtonpin));
 
-  if (analogRead(startButtonpin) > 900) {
+  if (analogRead(startButtonpin) > BUTTON_THREASHOLD) {
     digitalWrite(motor1pin1, LOW);
     digitalWrite(motor1pin2, LOW);
 
@@ -140,6 +150,7 @@ void loop() {
 
     Serial.print(analogRead(startButtonpin));
     Serial.println(" Big Red Button");
+    analogWrite(startButtonpin, 0);
 
     delay(1000);
     config();
@@ -162,7 +173,7 @@ void loop() {
     digitalWrite(motor2pin2, LOW);
 
   } else if (lightRight < PRESET_SENSITIVITY && lightLeft >= PRESET_SENSITIVITY) { // 0 - 1
-    adjustSpeed(LEFT_SPEED_10, /* RIGHT_SPEED_10 */ -25, TURN_MULTIPLIER);
+    adjustSpeed(LEFT_SPEED_10, /* RIGHT_SPEED_10 */ REVERSE_SPEED, TURN_MULTIPLIER);
     digitalWrite(leftLEDpin, LOW);
     digitalWrite(rightLEDpin, HIGH);
     Serial.print("0 1\n");
@@ -174,7 +185,7 @@ void loop() {
     digitalWrite(motor2pin1,  HIGH);
     digitalWrite(motor2pin2, LOW);
   } else if (lightRight >= PRESET_SENSITIVITY && lightLeft < PRESET_SENSITIVITY) { // 1 - 0
-    adjustSpeed( /*LEFT_SPEED_01*/ -1, RIGHT_SPEED_01, TURN_MULTIPLIER);
+    adjustSpeed( /*LEFT_SPEED_01*/ REVERSE_SPEED, RIGHT_SPEED_01, TURN_MULTIPLIER);
     digitalWrite(leftLEDpin, HIGH);
     digitalWrite(rightLEDpin, LOW);
     Serial.print("1 0\n");
@@ -185,31 +196,33 @@ void loop() {
 
     digitalWrite(motor2pin1,  LOW);
     digitalWrite(motor2pin2, HIGH);
-  } else { // 1 - 1
+  } 
+  /*
+  else { // 1 - 1
     adjustSpeed(LEFT_SPEED_11, RIGHT_SPEED_11, SPEED_MULTIPLIER);
     digitalWrite(leftLEDpin, HIGH);
     digitalWrite(rightLEDpin, HIGH);
     Serial.print("1 1\n");
   }
-
+  */
 }
 
 // Accepts percentage values from 0-100 & a float as a speed multiplier.
 // As of 3/29/24, also accepts negative values; they make the motors shut off for that condition.
 void adjustSpeed(int left, int right, float mult) {
   if (right > 0 && left > 0) {
-    analogWrite(motor1speed, map(right, 0, 100, 50, 255) * mult); 
-    analogWrite(motor2speed, map(left, 0, 100, 50, 255) * mult);
+    analogWrite(motor1speed, map(right * mult, 0, 100, 50, 255)); 
+    analogWrite(motor2speed, map(left * mult, 0, 100, 50, 255));
     return;
   } else if (right < 0 && left > 0) {
-    analogWrite(motor1speed, map(right, -100, 0, -255, -50) * mult);
-    Serial.println(map(right, -100, 0, -255, -50) * mult);
-    analogWrite(motor2speed, map(left, 0, 100, 50, 255) * mult);
-    Serial.println(map(left, 0, 100, 50, 255) * mult);
+    analogWrite(motor1speed, map(-right * mult, 0, 100, 50, 255));
+    Serial.println(map(-right * mult, 0, 100, 50, 255));
+    analogWrite(motor2speed, map(left * mult, 0, 100, 50, 255));
+    Serial.println(map(left * mult, 0, 100, 50, 255));
     return;
   } else if (right > 0 && left < 0) {
-    analogWrite(motor1speed, map(right, 0, 100, 50, 255) * mult); 
-    analogWrite(motor2speed, map(left, -100, 0, -255, -50) * mult); 
+    analogWrite(motor1speed, map(right * mult, 0, 100, 50, 255)); 
+    analogWrite(motor2speed, map(-left * mult, 0, 100, 50, 255)); 
     return;
   }
 

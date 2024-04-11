@@ -17,21 +17,22 @@ int activeLEDpin = 2;
 int leftLEDpin = 4;
 int rightLEDpin = 3;
 
-// constants
+// Sensor vars
+int SENSOR_STATE = 0;
+bool flipped = true;
+
+// Sensor Constants
 const int PRESET_SENSITIVITY = 100;
+const int BUTTON_THREASHOLD = 750;
+
+// Drive Constants
 const float SPEED_MULTIPLIER = .25;
 const float TURN_MULTIPLIER = .6;
-const int RIGHT_SPEED_00 = 100;
-const int LEFT_SPEED_00 = 100;
-const int RIGHT_SPEED_01 = 75;
-const int LEFT_SPEED_01 = 100;
-const int RIGHT_SPEED_10 = 100;
-const int LEFT_SPEED_10 = 75;
-const int RIGHT_SPEED_11 = -1;
-const int LEFT_SPEED_11 = -1;
-const int REVERSE_SPEED = -90;
 
-const int BUTTON_THREASHOLD = 1000;
+const int REVERSE_SPEED = -90;
+const int TURN_SPEED = 75;
+const int FORWARDS_SPEED = 100;
+const int STOP = -1;
 
 void setup() {
   Serial.begin(9600);
@@ -62,7 +63,6 @@ void setup() {
   pinMode(rightLEDpin, OUTPUT);
 
   // While loop to hold before button press
-
   config();
 }
 
@@ -99,23 +99,11 @@ void config() {
     Serial.println(adjLightReadLeft);
     Serial.print("THE BUTTON :: ");
     Serial.println(analogRead(startButtonpin));
+    Serial.print("Sensor State :: ");
+    Serial.println(SENSOR_STATE);
 
-    if (adjLightReadRight < PRESET_SENSITIVITY && adjLightReadLeft < PRESET_SENSITIVITY) { // 0 - 0
-      digitalWrite(leftLEDpin, LOW);
-      digitalWrite(rightLEDpin, LOW);
-    } else if (adjLightReadRight < PRESET_SENSITIVITY && adjLightReadLeft >= PRESET_SENSITIVITY) { // 0 - 1
-      digitalWrite(leftLEDpin, LOW);
-      digitalWrite(rightLEDpin, HIGH);
-    } else if (adjLightReadRight >= PRESET_SENSITIVITY && adjLightReadLeft < PRESET_SENSITIVITY) { // 1 - 0
-      digitalWrite(leftLEDpin, HIGH);
-      digitalWrite(rightLEDpin, LOW);
-    } else { // 1 - 1
-      digitalWrite(leftLEDpin, HIGH);
-      digitalWrite(rightLEDpin, HIGH);
-    }
-
-    //digitalWrite();
-
+    sensorLogic(adjLightReadLeft, adjLightReadRight, flipped);
+    sensorLights();
   }
 }
 
@@ -125,28 +113,18 @@ int lightLeft;
 
 void loop() {
   digitalWrite(activeLEDpin, HIGH);
-  // put your main code here, to run repeatedly:
-
-  //Controlling speed (0  = off and 255 = max speed):
-  // analogWrite(motor1speed, 255); 
-  // analogWrite(motor2speed, 255); 
-
-  // Both Run the same direction set up like this. WARNING flipping motors will flip directions.
-
   delay(10);
 
   sensitivityScale = map(analogRead(potentiometerpin), 0, 1023, 50, 500);
   lightRight = map((long) (analogRead(lightsensRIGHTpin) * (sensitivityScale / 100)), 0, 1023, 1, 100);
   lightLeft = map((long) (analogRead(lightsensLEFTpin) * (sensitivityScale / 100)), 0, 1023, 1, 100);
-  
-  Serial.println(analogRead(startButtonpin));
+
+  sensorLogic(lightLeft, lightRight, flipped);
+  sensorLights();
+  motorDrive();
 
   if (analogRead(startButtonpin) > BUTTON_THREASHOLD) {
-    digitalWrite(motor1pin1, LOW);
-    digitalWrite(motor1pin2, LOW);
-
-    digitalWrite(motor2pin1, LOW);
-    digitalWrite(motor2pin2, LOW);
+    setMotorDrive(LOW, LOW);
 
     Serial.print(analogRead(startButtonpin));
     Serial.println(" Big Red Button");
@@ -155,56 +133,97 @@ void loop() {
     delay(1000);
     config();
   }
+}
 
-  // Low means "light", and high means "dark"
-  // if it's "light", then the value is about 10
-
-  if (lightRight < PRESET_SENSITIVITY && lightLeft < PRESET_SENSITIVITY) { // 0 - 0
-    adjustSpeed(LEFT_SPEED_00, RIGHT_SPEED_00, SPEED_MULTIPLIER);
-    digitalWrite(leftLEDpin, LOW);
-    digitalWrite(rightLEDpin, LOW);
-    Serial.print("0 0\n");
-    
-    // Set motor direction
-    digitalWrite(motor1pin1,  HIGH);
-    digitalWrite(motor1pin2, LOW);
-
-    digitalWrite(motor2pin1,  HIGH);
-    digitalWrite(motor2pin2, LOW);
-
-  } else if (lightRight < PRESET_SENSITIVITY && lightLeft >= PRESET_SENSITIVITY) { // 0 - 1
-    adjustSpeed(LEFT_SPEED_10, /* RIGHT_SPEED_10 */ REVERSE_SPEED, TURN_MULTIPLIER);
-    digitalWrite(leftLEDpin, LOW);
-    digitalWrite(rightLEDpin, HIGH);
-    Serial.print("0 1\n");
-    
-    // Set motor direction
-    digitalWrite(motor1pin1,  LOW);
-    digitalWrite(motor1pin2, HIGH);
-
-    digitalWrite(motor2pin1,  HIGH);
-    digitalWrite(motor2pin2, LOW);
-  } else if (lightRight >= PRESET_SENSITIVITY && lightLeft < PRESET_SENSITIVITY) { // 1 - 0
-    adjustSpeed( /*LEFT_SPEED_01*/ REVERSE_SPEED, RIGHT_SPEED_01, TURN_MULTIPLIER);
-    digitalWrite(leftLEDpin, HIGH);
-    digitalWrite(rightLEDpin, LOW);
-    Serial.print("1 0\n");
-
-    // Set motor direction
-    digitalWrite(motor1pin1,  HIGH);
-    digitalWrite(motor1pin2, LOW);
-
-    digitalWrite(motor2pin1,  LOW);
-    digitalWrite(motor2pin2, HIGH);
-  } 
-  /*
-  else { // 1 - 1
-    adjustSpeed(LEFT_SPEED_11, RIGHT_SPEED_11, SPEED_MULTIPLIER);
-    digitalWrite(leftLEDpin, HIGH);
-    digitalWrite(rightLEDpin, HIGH);
-    Serial.print("1 1\n");
+void sensorLogic(int lightLeft, int lightRight, bool flipped) {
+  if (flipped == false) {
+    if (lightLeft < PRESET_SENSITIVITY && lightRight < PRESET_SENSITIVITY) {
+      SENSOR_STATE = 1;
+      return;
+    } else if (lightLeft >= PRESET_SENSITIVITY && lightRight < PRESET_SENSITIVITY) {
+      SENSOR_STATE = 2;
+      return;
+    } else if (lightLeft < PRESET_SENSITIVITY && lightRight >= PRESET_SENSITIVITY) {
+      SENSOR_STATE = 3;
+      return;
+    }
+  } else {
+    if (lightLeft > PRESET_SENSITIVITY && lightRight > PRESET_SENSITIVITY) {
+      SENSOR_STATE = 1;
+      return;
+    } else if (lightLeft <= PRESET_SENSITIVITY && lightRight > PRESET_SENSITIVITY) {
+      SENSOR_STATE = 2;
+      return;
+    } else if (lightLeft > PRESET_SENSITIVITY && lightRight <= PRESET_SENSITIVITY) {
+      SENSOR_STATE = 3;
+      return;
+    }
   }
-  */
+  SENSOR_STATE = 0;
+}
+
+/* sensorLights - Sets light on when the corrosponding sensor sees tape
+*/
+void sensorLights() {
+  switch (SENSOR_STATE) {
+    case 0: // BOTH
+      digitalWrite(leftLEDpin, HIGH);
+      digitalWrite(rightLEDpin, HIGH);
+      break;
+    case 1: // NONE
+      digitalWrite(leftLEDpin, LOW);
+      digitalWrite(rightLEDpin, LOW);
+      break;
+    case 2: // LEFT
+      digitalWrite(leftLEDpin, HIGH);
+      digitalWrite(rightLEDpin, LOW);
+      break;
+    case 3: // RIGHT
+      digitalWrite(leftLEDpin, LOW);
+      digitalWrite(rightLEDpin, HIGH);
+      break;
+  } 
+}
+
+/* motorDrive - Logic behind motor drive
+*/
+void motorDrive() {
+  switch (SENSOR_STATE) {
+    case 0: // BOTH
+      break;
+    case 1: // NONE
+      setMotorDrive(HIGH, HIGH);
+      adjustSpeed(FORWARDS_SPEED, FORWARDS_SPEED, SPEED_MULTIPLIER);
+      break;
+    case 2: // LEFT
+      setMotorDrive(HIGH, LOW);
+      adjustSpeed(REVERSE_SPEED, TURN_SPEED, TURN_MULTIPLIER);
+      break;
+    case 3: // RIGHT
+      setMotorDrive(LOW, HIGH);
+      adjustSpeed(TURN_SPEED, REVERSE_SPEED, TURN_MULTIPLIER);
+      break;
+  } 
+}
+
+/* setMotorDrive - Sets motor drive direction
+/  Inputs - int left (HIGH/LOW), int right (HIGH/LOW)
+/  HIGH sets motor forwards, LOW sets motor backwards.
+*/
+void setMotorDrive(int left, int right) {
+  if (left == LOW && right == LOW) {
+    digitalWrite(motor2pin1, left);
+    digitalWrite(motor2pin2, left);
+
+    digitalWrite(motor1pin1, right);
+    digitalWrite(motor1pin2, right);
+  } else {
+    digitalWrite(motor2pin1, left);
+    digitalWrite(motor2pin2, !left);
+
+    digitalWrite(motor1pin1, right);
+    digitalWrite(motor1pin2, !right);
+  }
 }
 
 // Accepts percentage values from 0-100 & a float as a speed multiplier.
@@ -227,7 +246,5 @@ void adjustSpeed(int left, int right, float mult) {
   }
 
   // Negative number case is shutting the motors off.
-  analogWrite(motor1speed, 0);
-  analogWrite(motor2speed, 0);
-  
+  setMotorDrive(LOW, LOW);
 }

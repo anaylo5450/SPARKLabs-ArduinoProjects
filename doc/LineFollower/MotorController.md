@@ -1,13 +1,17 @@
-Accurate as of ```2024-04-12 10:50:00```
+Accurate as of ```2024-04-12 11:45:00```
 
 - [Constants and Pins](#constants-and-pins)
-      - [The most important part of an Arduino's codebase.](#the-most-important-part-of-an-arduinos-codebase)
     - [Motor Pins](#motor-pins)
     - [Input Pins](#input-pins)
     - [Output Pins](#output-pins)
     - [SENSOR\_CONSTANTS](#sensor_constants)
-
-
+    - [CONTROL\_CONSTANTS](#control_constants)
+- [Function Reference](#function-reference)
+    - [setup()](#setup)
+    - [config()](#config)
+    - [loop()](#loop)
+    - [sensorLogic(int, int, bool)](#sensorlogicint-int-bool)
+    - [sensorLights()](#sensorlights)
 
 # Constants and Pins
 *The most important part of an Arduino's codebase.*
@@ -52,4 +56,51 @@ Accurate as of ```2024-04-12 10:50:00```
 
 ```PRESET_SENSITIVITY```: value decided against for determining whether an IR sensor's value can change the program's state
 
-```BUTTON_THRESHOLD
+```BUTTON_THRESHOLD```: voltage threshold for the button, as it is mapped to an analog pin. Why? See: [```startButtonpin```](#input-pins)
+
+### CONTROL_CONSTANTS
+
+```SPEED_MULTIPLIER```: float value for controlling the speed of the robot. Can go above 1.0, if your motors are capable. Do not set below 0.0.
+
+```TURN_MULTIPLIER```: float value for controlling how powerful the turning actions are. Can go above 1.0, if your motors are capable. Do not set below 0.0.
+
+```REVERSE_SPEED```: magic number setting the default reverse speed value
+
+```TURN_SPEED```: magic number setting the default value on the turning motor
+
+```FORWARDS_SPEED```: magic number setting the default forwards speed value
+
+```STOP```: -1, which when passed to the ```adjustSpeed()``` function, will kill movement
+
+# Function Reference
+
+*The logic computations, initialization calls, and the FSM.*
+
+### setup()
+
+Like most arduino programs, this function sets pin directions & initializes communication over the serial port. Where this program differs is that the [config()](#config) function activates immediately before heading into [loop()](#loop).
+
+### config()
+
+Like a normal setup function, but on a loop. Within that loop, the robot is considered to be 'idling.' While idling, you can adjust the sensitivity of the IR sensors with the onboard potentiometer and see the sensor output through the blue sensor LEDs without the robot moving. This function exits when the state button is pressed.
+
+Addtionally, this function controls the green LED representing the program's activity state.
+
+### loop()
+
+Take a normal loop function, and add a ton more encapsulation. That's what this program's loop is. In this function, the robot is considered to be 'active.' There is a tiny reading delay
+to make the robot less jerky and the there is logic to compute whether the IR sensors are making a detection or not. Finally, there is a conditional for the 5v button that can send the robot back to 'idling.'
+
+To elaborate on the IR sensor computation: map functions change the incoming IR value into one that is more palatable for the proceeding functions. `lightRight` & `lightLeft` are those values; pass those to [`sensorLogic(int, int bool)`](#sensorlogicint-int-bool) and not the raw values.
+
+### sensorLogic(int, int, bool)
+
+In order, takes a value for the left IR sensor's adjusted value, the right IR sensor's adjusted value, and the boolean constant, [`flipped`](#sensor_constants).
+
+This function is the main controller for the Finite State Machine. Upon making a decision based on the adjusted IR sensor values and the [`PRESET_SENSITIVITY`](#sensor_constants) constant, it changes the global variable [`SENSOR_STATE`](#sensor_constants) to make decisions about where to send the robots. After making a decision, the function returns.
+
+If a decision fails to be made, [`SENSOR_STATE`](#sensor_constants) is set to 0.
+
+### sensorLights()
+
+

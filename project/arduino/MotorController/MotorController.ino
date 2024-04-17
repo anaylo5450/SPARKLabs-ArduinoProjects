@@ -23,7 +23,7 @@ bool flipped = true;
 
 // Sensor Constants
 const int PRESET_SENSITIVITY = 100;
-const int BUTTON_THREASHOLD = 750;
+const int BUTTON_THRESHOLD = 750;
 
 // Drive Constants
 const float SPEED_MULTIPLIER = .2;
@@ -78,7 +78,7 @@ void config() {
   while (true) {
     delay(250);
 
-    if (analogRead(startButtonpin) > BUTTON_THREASHOLD) {
+    if (analogRead(startButtonpin) > BUTTON_THRESHOLD) {
       digitalWrite(activeLEDpin, HIGH);
       delay(1000);
       Serial.println("Start Robot");
@@ -123,7 +123,7 @@ void loop() {
   sensorLights();
   motorDrive();
 
-  if (analogRead(startButtonpin) > BUTTON_THREASHOLD) {
+  if (analogRead(startButtonpin) > BUTTON_THRESHOLD) {
     setMotorDrive(LOW, LOW);
 
     Serial.print(analogRead(startButtonpin));

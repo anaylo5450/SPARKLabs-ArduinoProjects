@@ -26,8 +26,8 @@ const int PRESET_SENSITIVITY = 100;
 const int BUTTON_THREASHOLD = 750;
 
 // Drive Constants
-const float SPEED_MULTIPLIER = .25;
-const float TURN_MULTIPLIER = .6;
+const float SPEED_MULTIPLIER = .2;
+const float TURN_MULTIPLIER = .5;
 
 const int REVERSE_SPEED = -90;
 const int TURN_SPEED = 75;
@@ -35,7 +35,7 @@ const int FORWARDS_SPEED = 100;
 const int STOP = -1;
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(12000);
   // put your setup code here, to run once:
 
   // Initializing Motor Pins
@@ -113,7 +113,7 @@ int lightLeft;
 
 void loop() {
   digitalWrite(activeLEDpin, HIGH);
-  delay(10);
+  //delay(10);
 
   sensitivityScale = map(analogRead(potentiometerpin), 0, 1023, 50, 500);
   lightRight = map((long) (analogRead(lightsensRIGHTpin) * (sensitivityScale / 100)), 0, 1023, 1, 100);
@@ -194,14 +194,17 @@ void motorDrive() {
     case 1: // NONE
       setMotorDrive(HIGH, HIGH);
       adjustSpeed(FORWARDS_SPEED, FORWARDS_SPEED, SPEED_MULTIPLIER);
+      //delay(100);
       break;
     case 2: // LEFT
       setMotorDrive(HIGH, LOW);
       adjustSpeed(REVERSE_SPEED, TURN_SPEED, TURN_MULTIPLIER);
+      //delay(10);
       break;
     case 3: // RIGHT
       setMotorDrive(LOW, HIGH);
       adjustSpeed(TURN_SPEED, REVERSE_SPEED, TURN_MULTIPLIER);
+      //delay(10);
       break;
   } 
 }
